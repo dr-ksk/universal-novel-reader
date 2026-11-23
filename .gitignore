@@ -1,0 +1,25 @@
+# Build & Gradle caches
+**/build/
+**/.gradle/
+**/.kotlin/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# Local environment / IDE
+local.properties
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Logs / temporary files
+*.log
+*.tmp
+*.db
+*.db-journal

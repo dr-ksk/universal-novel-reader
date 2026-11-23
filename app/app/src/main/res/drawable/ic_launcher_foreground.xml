@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Soft drop shadow under the book -->
+    <path
+        android:fillColor="#3800141F"
+        android:pathData="M28.5,41 C28.5,39.3 29.8,38 31.5,38 L54,41.8 L76.5,38 C78.2,38 79.5,39.3 79.5,41 L79.5,74.2 C79.5,75.9 78.2,77.1 76.5,77 L54,80 L31.5,77 C29.8,77.1 28.5,75.9 28.5,74.2 Z" />
+
+    <!-- Book outer cover (deep navy slate) -->
+    <path
+        android:fillColor="#0E2D3D"
+        android:pathData="M27.5,38.5 C27.5,36.8 28.8,35.6 30.5,35.8 L54,39.5 L77.5,35.8 C79.2,35.6 80.5,36.8 80.5,38.5 L80.5,72 C80.5,73.7 79.2,74.8 77.5,74.7 L54,77.5 L30.5,74.7 C28.8,74.8 27.5,73.7 27.5,72 Z" />
+
+    <!-- Page stack thickness (bottom edge) -->
+    <path
+        android:fillColor="#D4CEC2"
+        android:pathData="M29.8,68.5 C36.5,67 46,67.6 54,71.2 L54,74.2 C46,70.7 36.5,70.1 29.8,71.6 Z" />
+    <path
+        android:fillColor="#C5BEB0"
+        android:pathData="M54,71.2 C62,67.6 71.5,67 78.2,68.5 L78.2,71.6 C71.5,70.1 62,70.7 54,74.2 Z" />
+
+    <!-- Left open page (warm paper white) -->
+    <path
+        android:fillColor="#FDFBF7"
+        android:pathData="M30,36 C36.8,34.4 46.2,35 54,39.2 L54,71.4 C46.2,67.6 36.8,67 30,68.6 Z" />
+
+    <!-- Right open page (slightly shaded paper) -->
+    <path
+        android:fillColor="#F2EDE4"
+        android:pathData="M54,39.2 C61.8,35 71.2,34.4 78,36 L78,68.6 C71.2,67 61.8,67.6 54,71.4 Z" />
+
+    <!-- Center spine shadow (left side) -->
+    <path android:pathData="M48,36.8 C50.3,37.4 52.3,38.2 54,39.2 L54,71.4 C52.3,70.4 50.3,69.6 48,69 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="48"
+                android:startY="54"
+                android:endX="54"
+                android:endY="54"
+                android:type="linear">
+                <item
+                    android:color="#00002B3D"
+                    android:offset="0.0" />
+                <item
+                    android:color="#26002B3D"
+                    android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Center spine shadow (right side) -->
+    <path android:pathData="M54,39.2 C55.7,38.2 57.7,37.4 60,36.8 L60,69 C57.7,69.6 55.7,70.4 54,71.4 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="54"
+                android:startY="54"
+                android:endX="60"
+                android:endY="54"
+                android:type="linear">
+                <item
+                    android:color="#2C002B3D"
+                    android:offset="0.0" />
+                <item
+                    android:color="#00002B3D"
+                    android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Vertical writing lines on left page (Japanese novel tategaki motif) -->
+    <path
+        android:pathData="M47.5,43.2 L47.5,62.2"
+        android:strokeColor="#48687A"
+        android:strokeWidth="2.1"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M42.2,42.2 L42.2,61.6"
+        android:strokeColor="#648394"
+        android:strokeWidth="2.1"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M36.9,42.2 L36.9,55.2"
+        android:strokeColor="#819DAD"
+        android:strokeWidth="2.1"
+        android:strokeLineCap="round" />
+
+    <!-- Vertical writing lines on right page -->
+    <path
+        android:pathData="M64.2,42.2 L64.2,61.6"
+        android:strokeColor="#48687A"
+        android:strokeWidth="2.1"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M59.2,43.4 L59.2,58.8"
+        android:strokeColor="#648394"
+        android:strokeWidth="2.1"
+        android:strokeLineCap="round" />
+
+    <!-- Bookmark ribbon subtle shadow -->
+    <path
+        android:fillColor="#26001A26"
+        android:pathData="M68.2,35.4 L75.2,35.4 L75.2,56.2 L71.9,53.2 L68.2,56.2 Z" />
+
+    <!-- Vermilion bookmark ribbon -->
+    <path android:pathData="M68.8,32.5 L74.6,32.5 L74.6,54.8 L71.7,51.6 L68.8,54.8 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="71.7"
+                android:startY="32.5"
+                android:endX="71.7"
+                android:endY="54.8"
+                android:type="linear">
+                <item
+                    android:color="#F26B52"
+                    android:offset="0.0" />
+                <item
+                    android:color="#D94532"
+                    android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

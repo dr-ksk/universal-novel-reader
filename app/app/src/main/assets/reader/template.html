@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Reader</title>
+  <style>
+    :root {
+      --bg-color: #ffffff;
+      --text-color: #222222;
+      --sub-color: #666666;
+      --font-size: 18px;
+      --line-height: 1.85;
+      --font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+    }
+
+    body.theme-sepia {
+      --bg-color: #f6f1e7;
+      --text-color: #3b302a;
+      --sub-color: #7d6b5e;
+    }
+
+    body.theme-dark {
+      --bg-color: #121212;
+      --text-color: #d0d0d0;
+      --sub-color: #888888;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: var(--font-family);
+      font-size: var(--font-size);
+      line-height: var(--line-height);
+      padding: 24px 20px 80px 20px;
+      transition: background-color 0.2s, color 0.2s;
+      overflow-x: hidden;
+      user-select: none;
+    }
+
+    /* 縦書きモード */
+    body.vertical-mode {
+      writing-mode: vertical-rl;
+      -webkit-writing-mode: vertical-rl;
+      height: 100vh;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 20px 24px 20px 24px;
+    }
+
+    .chapter-title {
+      font-size: calc(var(--font-size) * 0.9);
+      color: var(--sub-color);
+      margin-bottom: 8px;
+    }
+
+    .episode-title {
+      font-size: calc(var(--font-size) * 1.35);
+      font-weight: bold;
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+    }
+
+    body.vertical-mode .episode-title {
+      border-bottom: none;
+      border-left: 1px solid rgba(128, 128, 128, 0.2);
+      padding-bottom: 0;
+      padding-left: 12px;
+      margin-bottom: 0;
+      margin-left: 24px;
+    }
+
+    .content-body p {
+      margin-bottom: 1em;
+      text-indent: 1em;
+      word-break: break-all;
+    }
+
+    ruby rt {
+      font-size: 0.55em;
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+      margin: 16px auto;
+      display: block;
+      border-radius: 4px;
+    }
+
+    .navigation-footer {
+      margin-top: 48px;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    body.vertical-mode .navigation-footer {
+      margin-top: 0;
+      margin-left: 48px;
+    }
+
+    .nav-btn {
+      flex: 1;
+      padding: 12px;
+      text-align: center;
+      background-color: rgba(128, 128, 128, 0.15);
+      border-radius: 8px;
+      font-size: calc(var(--font-size) * 0.95);
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body class="theme-white">
+  <div class="chapter-title" id="chapterTitle"></div>
+  <div class="episode-title" id="episodeTitle"></div>
+  <div class="content-body" id="contentBody"></div>
+
+  <script>
+    function setContent(data) {
+      document.getElementById('chapterTitle').textContent = data.chapterTitle || '';
+      document.getElementById('episodeTitle').textContent = data.episodeTitle || '';
+      document.getElementById('contentBody').innerHTML = data.contentHtml || '';
+      window.scrollTo(0, 0);
+    }
+
+    function setTheme(theme) {
+      document.body.classList.remove('theme-white', 'theme-sepia', 'theme-dark');
+      document.body.classList.add('theme-' + theme);
+    }
+
+    function setVerticalMode(isVertical) {
+      if (isVertical) {
+        document.body.classList.add('vertical-mode');
+      } else {
+        document.body.classList.remove('vertical-mode');
+      }
+    }
+
+    function setFontSize(sizePx) {
+      document.documentElement.style.setProperty('--font-size', sizePx + 'px');
+    }
+
+    // 画面タップでメニュー表示切り替えをアプリ側に通知
+    document.addEventListener('click', function(e) {
+      // 画面中央50%タップでメニュー表示
+      const width = window.innerWidth;
+      const x = e.clientX;
+      if (x > width * 0.25 && x < width * 0.75) {
+        if (window.AppBridge && window.AppBridge.toggleReaderMenu) {
+          window.AppBridge.toggleReaderMenu();
+        }
+      }
+    });
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,25 @@
+# タスクリスト: マルチサイト対応Web小説リーダーアプリ (UniversalNovelReader)
+
+- [x] フェーズ1: 依存関係・基盤設定の構築 <!-- id: 1 -->
+    - [x] `libs.versions.toml` および `build.gradle.kts` に Jsoup, SnakeYAML, OkHttp, kotlinx-serialization を追加 <!-- id: 2 -->
+    - [x] AndroidManifest.xml にインターネットアクセス権限 (`android.permission.INTERNET`) の追加 <!-- id: 3 -->
+    - [x] Gradle ビルド検証 <!-- id: 4 -->
+- [x] フェーズ2: データアクセス層・ストレージ基盤の実装 <!-- id: 5 -->
+    - [x] SQLiteHelper / DatabaseManager の実装（`site_adapters`, `reader_settings`, `novels`, `episodes`） <!-- id: 6 -->
+    - [x] ファイルストレージマネージャーの実装（`novels/<id>/episodes/*.json`, 画像キャッシュ） <!-- id: 7 -->
+    - [x] 初期プリセットサイト定義（YAML: 小説家になろう標準 `syosetu_standard`）の登録ロジック <!-- id: 8 -->
+- [x] フェーズ3: デュアルアダプター・ネットワークエンジンの実装 <!-- id: 9 -->
+    - [x] NativeHttpClient（OkHttpベース、Cookie/Header対応、HTML直取得、画像キャッシュDL） <!-- id: 10 -->
+    - [x] YamlJsoupAdapter の実装（YAMLパース ＋ Jsoupセレクタ抽出エンジン） <!-- id: 11 -->
+    - [x] JsWebViewAdapter ＆ AppBridgeService の実装（JS実行、ネイティブAPI提供） <!-- id: 12 -->
+    - [x] SiteAdapterManager（URLドメイン正規表現マッチング ＆ エンジンディスパッチャ） <!-- id: 13 -->
+- [x] フェーズ4: CSVインポート・エクスポート基盤の実装 <!-- id: 14 -->
+    - [x] CsvSyncManager の実装（寛容なヘッダー判定、URL抽出、エクスポート生成） <!-- id: 15 -->
+- [x] フェーズ5: UIレイヤ（Jetpack Compose）の実装 <!-- id: 16 -->
+    - [x] ① 本棚画面 (`BookshelfScreen`): 一覧表示、FAB登録、CSV入出力メニュー、更新チェック <!-- id: 17 -->
+    - [x] ② 小説詳細・目次画面 (`NovelDetailScreen`): 全話リスト、続きを読む、未対応ドメイン案内カード <!-- id: 18 -->
+    - [x] ③ クリーンリーダー画面 (`ReaderScreen`): ローカルWebView、日本語縦横組版、2段階CSSカスタマイズ、しおり・90%既読 <!-- id: 19 -->
+    - [x] ④ 設定画面 (`SettingsScreen`) & ⑤ サイト定義管理画面 (`AdapterStudioScreen`) <!-- id: 20 -->
+- [x] フェーズ6: 統合検証・ビルド確認 <!-- id: 21 -->
+    - [x] ユニットテストコード配置とパースロジック確認 <!-- id: 22 -->
+    - [x] APKビルド（`app-debug.apk`）成功確認 <!-- id: 23 -->
