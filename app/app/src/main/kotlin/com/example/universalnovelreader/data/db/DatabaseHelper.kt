@@ -13,7 +13,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 
     companion object {
         const val DATABASE_NAME = "universal_novel_reader.db"
-        const val DATABASE_VERSION = 8
+        const val DATABASE_VERSION = 9
 
         const val TABLE_SITE_ADAPTERS = "site_adapters"
         const val TABLE_READER_SETTINGS = "reader_settings"
@@ -118,8 +118,14 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             }
             db.update(TABLE_SITE_ADAPTERS, adapterValues, "adapter_id = ? AND is_builtin = 1", arrayOf("syosetu_standard"))
         }
-        if (oldVersion < 8) {
-            // プリセットに「カクヨム」を追加（既存データは保持）
+        if (oldVersion < 9) {
+            // 組み込みプリセットの定義を最新仕様へ同期（既存の本棚データは保持）
+            val syosetuValues = ContentValues().apply {
+                put("domain_pattern", "^https?://(ncode|novel18)\\.syosetu\\.com/[a-z0-9]+(/.*)?$")
+                put("content", getBuiltinYamlContent())
+                put("version", "1.0.5")
+            }
+            db.update(TABLE_SITE_ADAPTERS, syosetuValues, "adapter_id = ? AND is_builtin = 1", arrayOf("syosetu_standard"))
             upsertBuiltinKakuyomuAdapter(db)
         }
     }
@@ -139,7 +145,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             put("adapter_type", "yaml")
             put("content", yamlContent)
             put("custom_css", "ruby rt { font-size: 0.52em; }")
-            put("version", "1.0.4")
+            put("version", "1.0.5")
             put("is_builtin", 1)
         }
         db.insert(TABLE_SITE_ADAPTERS, null, values)
@@ -155,7 +161,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
             put("adapter_type", "yaml")
             put("content", getBuiltinKakuyomuYamlContent())
             put("custom_css", "ruby rt { font-size: 0.52em; }\n.blank { height: 1em; }")
-            put("version", "1.0.0")
+            put("version", "1.0.1")
             put("is_builtin", 1)
         }
         val updated = db.update(TABLE_SITE_ADAPTERS, values, "adapter_id = ?", arrayOf("kakuyomu_standard"))
@@ -184,7 +190,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
 metadata:
   id: "syosetu_standard"
   name: "小説家になろう"
-  version: "1.0.4"
+  version: "1.0.5"
   domain_pattern: "^https?://(ncode|novel18)\\.syosetu\\.com/[a-z0-9]+(/.*)?$"
 
 headers:
@@ -215,7 +221,6 @@ episode:
 
 crawl:
   interval_ms: 1500
-  auto_cache_on_sync: false
   cache_images: true
 
 custom_css: |
@@ -229,7 +234,7 @@ custom_css: |
 metadata:
   id: "kakuyomu_standard"
   name: "カクヨム"
-  version: "1.0.0"
+  version: "1.0.1"
   domain_pattern: "^https?://kakuyomu\\.jp/works/\\d+(/.*)?$"
 
 headers:
@@ -250,7 +255,6 @@ episode:
 
 crawl:
   interval_ms: 1500
-  auto_cache_on_sync: false
   cache_images: true
 """.trimIndent()
 }

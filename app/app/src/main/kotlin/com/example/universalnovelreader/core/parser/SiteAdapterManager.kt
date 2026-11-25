@@ -1,6 +1,7 @@
 package com.example.universalnovelreader.core.parser
 
 import android.content.Context
+import com.example.universalnovelreader.core.network.HttpStatusException
 import com.example.universalnovelreader.core.network.NativeHttpClient
 import com.example.universalnovelreader.data.db.NovelRepository
 import com.example.universalnovelreader.data.model.Episode
@@ -9,12 +10,19 @@ import com.example.universalnovelreader.data.model.Novel
 import com.example.universalnovelreader.data.model.SiteAdapter
 import com.example.universalnovelreader.data.storage.CacheManager
 import com.example.universalnovelreader.engine.ScriptExecutionBridge
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+data class RecacheAllResult(
+    val succeededCount: Int,
+    val totalCount: Int,
+    val stoppedReason: String? = null
+)
 
 data class AdapterTestResult(
     val success: Boolean,
@@ -45,7 +53,6 @@ class SiteAdapterManager(
 
     /**
      * 目次の同期＆更新チェック
-     * （仕様の穴：auto_cache_on_sync が有効なら本文も受動的にキャッシュ）
      */
     suspend fun syncNovelIndex(topUrl: String): Result<Novel> = withContext(Dispatchers.IO) {
         try {
@@ -77,7 +84,7 @@ class SiteAdapterManager(
                     if (!nextUrl.isNullOrEmpty() && nextUrl != currentUrl) {
                         currentUrl = nextUrl
                         pageCount++
-                        delay(300) // サーバー負荷軽減の安全待機
+                        delay(maxOf(1500L, yamlAdapter.crawlIntervalMs)) // サーバー負荷軽減の安全待機
                     } else {
                         break
                     }
@@ -137,21 +144,6 @@ class SiteAdapterManager(
                     repository.insertOrUpdateEpisode(episode)
                 }
 
-                // 「仕様の穴」：auto_cache_on_sync が true の場合、未キャッシュの話を順次キャッシュ
-                if (yamlAdapter.autoCacheOnSync) {
-                    val allEpisodes = repository.getEpisodesForNovel(novelId)
-                    for (ep in allEpisodes) {
-                        if (ep.cachedAt == null) {
-                            try {
-                                fetchAndCacheEpisodeYaml(novelId, ep, yamlAdapter)
-                                delay(yamlAdapter.crawlIntervalMs)
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
-                        }
-                    }
-                }
-
                 Result.success(novel)
             } else {
                 // JavaScript形式アダプターの実行
@@ -171,17 +163,23 @@ class SiteAdapterManager(
     }
 
     /**
-     * 1話の本文取得（キャッシュがあればキャッシュから、なければWebから取得してキャッシュ保存）
+     * 1話の本文取得（キャッシュ優先、forceRefresh=true の場合はキャッシュを無視してサーバーから強制再キャッシュ）
      */
-    suspend fun getEpisodeContent(novelId: Long, episode: Episode): Result<EpisodeCacheData> = withContext(Dispatchers.IO) {
+    suspend fun getEpisodeContent(
+        novelId: Long,
+        episode: Episode,
+        forceRefresh: Boolean = false
+    ): Result<EpisodeCacheData> = withContext(Dispatchers.IO) {
         try {
-            // 1. すでにキャッシュがあるか確認
-            val cached = cacheManager.getEpisode(novelId, episode.episodeIndex)
-            if (cached != null) {
-                return@withContext Result.success(cached)
+            // 1. すでにキャッシュがあるか確認（強制再キャッシュ時はスキップ）
+            if (!forceRefresh) {
+                val cached = cacheManager.getEpisode(novelId, episode.episodeIndex)
+                if (cached != null) {
+                    return@withContext Result.success(cached)
+                }
             }
 
-            // 2. キャッシュがない場合はアダプターでWebから取得
+            // 2. アダプターでWebから取得してキャッシュを保存（上書き）
             val adapter = getAdapterForUrl(episode.url)
                 ?: return@withContext Result.failure(IllegalStateException("No adapter registered for: ${urlDomain(episode.url)}"))
 
@@ -190,6 +188,9 @@ class SiteAdapterManager(
                 val cacheData = fetchAndCacheEpisodeYaml(novelId, episode, yamlAdapter)
                 Result.success(cacheData)
             } else {
+                if (forceRefresh) {
+                    cacheManager.deleteEpisodeCache(novelId, episode.episodeIndex)
+                }
                 val jsResult = scriptEngine.executeEpisodeScript(episode.url, adapter.content)
                 if (jsResult.isSuccess) {
                     val newlyCached = cacheManager.getEpisode(novelId, episode.episodeIndex)
@@ -202,10 +203,65 @@ class SiteAdapterManager(
                     Result.failure(jsResult.exceptionOrNull() ?: Exception("JS episode parse error"))
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             e.printStackTrace()
             Result.failure(e)
         }
+    }
+
+    /**
+     * 指定小説の全話を安全ウェイト付きで強制再キャッシュする
+     */
+    suspend fun forceRecacheAllEpisodes(
+        novelId: Long,
+        onProgress: (current: Int, total: Int, episodeTitle: String) -> Unit
+    ): RecacheAllResult = withContext(Dispatchers.IO) {
+        val episodes = repository.getEpisodesForNovel(novelId)
+        if (episodes.isEmpty()) {
+            return@withContext RecacheAllResult(0, 0, "エピソードがありません")
+        }
+
+        val firstAdapter = getAdapterForUrl(episodes.first().url)
+        val intervalMs = if (firstAdapter != null && firstAdapter.adapterType == "yaml") {
+            maxOf(1500L, YamlJsoupAdapter(firstAdapter.content).crawlIntervalMs)
+        } else {
+            2500L
+        }
+
+        var succeeded = 0
+        var consecutiveErrors = 0
+        var stoppedReason: String? = null
+
+        for ((idx, ep) in episodes.withIndex()) {
+            onProgress(idx + 1, episodes.size, ep.title)
+            val res = getEpisodeContent(novelId, ep, forceRefresh = true)
+            if (res.isSuccess) {
+                succeeded++
+                consecutiveErrors = 0
+            } else {
+                val ex = res.exceptionOrNull()
+                if (ex is HttpStatusException && ex.isRateLimitOrOverloaded()) {
+                    stoppedReason = "サーバー応答 (${ex.statusCode}) のため安全のため中断しました"
+                    break
+                }
+                consecutiveErrors++
+                if (consecutiveErrors >= 3) {
+                    stoppedReason = "連続して取得に失敗したため中断しました"
+                    break
+                }
+            }
+            if (idx < episodes.lastIndex) {
+                delay(intervalMs)
+            }
+        }
+
+        RecacheAllResult(
+            succeededCount = succeeded,
+            totalCount = episodes.size,
+            stoppedReason = stoppedReason
+        )
     }
 
     private suspend fun fetchAndCacheEpisodeYaml(

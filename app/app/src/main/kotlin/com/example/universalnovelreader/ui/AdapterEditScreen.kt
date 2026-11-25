@@ -164,7 +164,6 @@ headers:
 
 crawl:
   interval_ms: 1500
-  auto_cache_on_sync: false
   cache_images: true
 """.trimIndent()
 

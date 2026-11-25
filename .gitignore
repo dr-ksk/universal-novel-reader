@@ -23,3 +23,8 @@ captures/
 *.tmp
 *.db
 *.db-journal
+
+# Local design docs & internal scripts (keep local only, exclude from Git)
+設計書.md
+docs/
+scripts/

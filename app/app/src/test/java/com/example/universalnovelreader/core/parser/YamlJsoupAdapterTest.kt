@@ -38,7 +38,6 @@ episode:
 
 crawl:
   interval_ms: 2500
-  auto_cache_on_sync: true
   cache_images: true
 """.trimIndent()
 
@@ -48,7 +47,6 @@ crawl:
 
         assertEquals("syosetu_standard", adapter.adapterId)
         assertEquals("小説家になろう", adapter.name)
-        assertTrue(adapter.autoCacheOnSync)
         assertTrue(adapter.cacheImages)
         assertEquals("over18=yes", adapter.customHeaders["Cookie"])
 

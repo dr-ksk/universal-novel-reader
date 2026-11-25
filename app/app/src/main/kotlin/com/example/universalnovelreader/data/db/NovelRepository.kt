@@ -35,7 +35,10 @@ class NovelRepository(context: Context) {
     }
 
     suspend fun findAdapterForUrl(url: String): SiteAdapter? = withContext(Dispatchers.IO) {
-        val adapters = getAllAdapters()
+        // ユーザーが追加・導入したカスタム/野良定義をプリセットより優先（新しい導入順）
+        val adapters = getAllAdapters().sortedWith(
+            compareBy<SiteAdapter> { it.isBuiltin }.thenByDescending { it.id }
+        )
         adapters.firstOrNull { adapter ->
             try {
                 Pattern.compile(adapter.domainPattern).matcher(url).find()

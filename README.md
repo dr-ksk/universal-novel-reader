@@ -17,9 +17,6 @@
 ## ディレクトリ構成
 
 - `app/` — Android Studio / Gradle プロジェクト（Kotlin + Jetpack Compose）
-- `scripts/` — 参考用パーサースクリプト
-- `docs/` — 開発ドキュメント・マニュアル
-- `設計書.md` — 詳細設計書
 
 ## ビルド方法
 

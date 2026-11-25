@@ -6,6 +6,7 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -20,6 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,12 +40,15 @@ fun ReaderScreen(
     viewModel: ReaderViewModel,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var currentEpIndex by remember { mutableStateOf(initialEpisodeIndex) }
     var currentEpisode by remember { mutableStateOf<Episode?>(null) }
     var currentData by remember { mutableStateOf<EpisodeCacheData?>(null) }
     var showMenu by remember { mutableStateOf(false) }
     var showSettingsSheet by remember { mutableStateOf(false) }
+    var isForceReloading by remember { mutableStateOf(false) }
+    var reloadCounter by remember { mutableStateOf(0) }
 
     val readerSettings by viewModel.readerSettings.collectAsState()
     val novel by viewModel.selectedNovel.collectAsState()
@@ -76,7 +81,7 @@ fun ReaderScreen(
     }
 
     // データまたはWebViewの準備完了時に確実に本文を反映
-    LaunchedEffect(currentData, webViewRef, episodes.size) {
+    LaunchedEffect(currentData, webViewRef, episodes.size, reloadCounter) {
         val data = currentData
         val wv = webViewRef
         android.util.Log.d("ReaderScreen", "Check reflect: data=${data != null}, wv=${wv != null}")
@@ -132,6 +137,33 @@ fun ReaderScreen(
                         }
                     },
                     actions = {
+                        IconButton(
+                            enabled = !isForceReloading && currentEpisode != null,
+                            onClick = {
+                                val ep = currentEpisode ?: return@IconButton
+                                scope.launch {
+                                    isForceReloading = true
+                                    val refreshed = viewModel.getEpisodeContent(novelId, ep, forceRefresh = true)
+                                    isForceReloading = false
+                                    if (refreshed != null) {
+                                        currentData = refreshed
+                                        reloadCounter++
+                                        Toast.makeText(context, "この話を強制再キャッシュしました", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        Toast.makeText(context, "再キャッシュに失敗しました", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                        ) {
+                            if (isForceReloading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(Icons.Default.Refresh, contentDescription = "この話を強制再キャッシュ")
+                            }
+                        }
                         IconButton(onClick = { showSettingsSheet = true }) {
                             Icon(Icons.Default.FormatSize, contentDescription = "表示設定")
                         }

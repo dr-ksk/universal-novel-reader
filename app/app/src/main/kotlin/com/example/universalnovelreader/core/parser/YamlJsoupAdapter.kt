@@ -14,7 +14,6 @@ interface ISiteAdapter {
     val adapterId: String
     val name: String
     val customHeaders: Map<String, String>
-    val autoCacheOnSync: Boolean
     val cacheImages: Boolean
     val crawlIntervalMs: Long
 
@@ -53,12 +52,6 @@ class YamlJsoupAdapter(
             return headersMap.mapValues { it.value.toString() }
         }
 
-    override val autoCacheOnSync: Boolean
-        get() {
-            val crawl = yamlConfig["crawl"] as? Map<*, *>
-            return (crawl?.get("auto_cache_on_sync") as? Boolean) ?: false
-        }
-
     override val cacheImages: Boolean
         get() {
             val crawl = yamlConfig["crawl"] as? Map<*, *>
@@ -68,7 +61,8 @@ class YamlJsoupAdapter(
     override val crawlIntervalMs: Long
         get() {
             val crawl = yamlConfig["crawl"] as? Map<*, *>
-            return (crawl?.get("interval_ms") as? Number)?.toLong() ?: 1500L
+            val raw = (crawl?.get("interval_ms") as? Number)?.toLong() ?: 1500L
+            return raw.coerceAtLeast(1000L) // サーバー保護のため最低1秒間隔を保証
         }
 
     private fun getMetadataString(key: String): String? {

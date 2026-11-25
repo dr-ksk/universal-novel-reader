@@ -16,6 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import kotlin.coroutines.resume
 
 class ScriptExecutionBridge(
@@ -54,15 +55,19 @@ class ScriptExecutionBridge(
                 }
             ) { wv ->
                 webView = wv
+                var executed = false
                 wv.webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, loadedUrl: String?) {
                         super.onPageFinished(view, loadedUrl)
+                        if (executed) return
+                        executed = true
+                        val targetUrlJs = JSONObject.quote(url)
                         val jsCode = """
                             (async function() {
                                 try {
                                     $scriptContent
                                     if (typeof SiteAdapter !== 'undefined' && SiteAdapter.parseIndex) {
-                                        await SiteAdapter.parseIndex(document.documentElement.outerHTML, window.location.href);
+                                        await SiteAdapter.parseIndex(document.documentElement.outerHTML, $targetUrlJs);
                                     }
                                 } catch(e) {
                                     console.error("parseIndex error: " + e.message);
@@ -105,15 +110,19 @@ class ScriptExecutionBridge(
                 }
             ) { wv ->
                 webView = wv
+                var executed = false
                 wv.webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, loadedUrl: String?) {
                         super.onPageFinished(view, loadedUrl)
+                        if (executed) return
+                        executed = true
+                        val targetEpUrlJs = JSONObject.quote(episodeUrl)
                         val jsCode = """
                             (async function() {
                                 try {
                                     $scriptContent
                                     if (typeof SiteAdapter !== 'undefined' && SiteAdapter.parseEpisode) {
-                                        await SiteAdapter.parseEpisode(document.documentElement.outerHTML, window.location.href);
+                                        await SiteAdapter.parseEpisode(document.documentElement.outerHTML, $targetEpUrlJs);
                                     }
                                 } catch(e) {
                                     console.error("parseEpisode error: " + e.message);

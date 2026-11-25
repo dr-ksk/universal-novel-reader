@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.universalnovelreader.core.network.NativeHttpClient
 import com.example.universalnovelreader.core.parser.AdapterTestResult
+import com.example.universalnovelreader.core.parser.RecacheAllResult
 import com.example.universalnovelreader.core.parser.SiteAdapterManager
 import com.example.universalnovelreader.data.catalog.AdapterCatalogClient
 import com.example.universalnovelreader.data.catalog.AdapterPackage
@@ -19,6 +20,9 @@ import com.example.universalnovelreader.data.model.SiteAdapter
 import com.example.universalnovelreader.data.storage.CacheManager
 import com.example.universalnovelreader.worker.AutoSyncManager
 import com.example.universalnovelreader.worker.AutoSyncSettings
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -86,6 +90,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     // ローディング状態
     val isLoading = MutableStateFlow(false)
     val statusMessage = MutableStateFlow<String?>(null)
+    val isRecachingAll = MutableStateFlow(false)
+    private var recacheAllJob: Job? = null
 
     init {
         loadBookshelf()
@@ -193,13 +199,16 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
             isLoading.value = true
             val novelList = repository.getAllNovels()
             var current = 0
-            for (novel in novelList) {
+            for ((idx, novel) in novelList.withIndex()) {
                 current++
                 statusMessage.value = "更新チェック中 (${current}/${novelList.size}): ${novel.title}"
                 try {
                     adapterManager.syncNovelIndex(novel.topUrl)
                 } catch (e: Exception) {
                     e.printStackTrace()
+                }
+                if (idx < novelList.lastIndex) {
+                    delay(1500) // サーバー負荷軽減のため作品間に待機
                 }
             }
             loadBookshelf()
@@ -209,11 +218,52 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /**
-     * エピソード本文の取得（キャッシュ優先、無ければWeb取得）
+     * エピソード本文の取得（キャッシュ優先、forceRefresh=true で強制再キャッシュ）
      */
-    suspend fun getEpisodeContent(novelId: Long, episode: Episode): EpisodeCacheData? {
-        val result = adapterManager.getEpisodeContent(novelId, episode)
+    suspend fun getEpisodeContent(
+        novelId: Long,
+        episode: Episode,
+        forceRefresh: Boolean = false
+    ): EpisodeCacheData? {
+        val result = adapterManager.getEpisodeContent(novelId, episode, forceRefresh)
+        if (forceRefresh && result.isSuccess) {
+            _currentEpisodes.value = repository.getEpisodesForNovel(novelId)
+            updateCacheSize()
+        }
         return result.getOrNull()
+    }
+
+    /**
+     * 作品の全話を安全ウェイト付きで強制再キャッシュ
+     */
+    fun forceRecacheAllEpisodes(novel: Novel, onComplete: (RecacheAllResult) -> Unit) {
+        if (isRecachingAll.value) return
+        recacheAllJob = viewModelScope.launch {
+            isLoading.value = true
+            isRecachingAll.value = true
+            statusMessage.value = "全話強制再キャッシュを準備中..."
+            try {
+                val res = adapterManager.forceRecacheAllEpisodes(novel.id) { current, total, epTitle ->
+                    statusMessage.value = "全話強制再キャッシュ中 ($current/$total): $epTitle"
+                }
+                loadNovelDetail(novel.id)
+                updateCacheSize()
+                onComplete(res)
+            } catch (e: CancellationException) {
+                loadNovelDetail(novel.id)
+                updateCacheSize()
+                onComplete(RecacheAllResult(0, _currentEpisodes.value.size, "ユーザー操作により中止しました"))
+            } finally {
+                isRecachingAll.value = false
+                isLoading.value = false
+                statusMessage.value = null
+                recacheAllJob = null
+            }
+        }
+    }
+
+    fun cancelForceRecache() {
+        recacheAllJob?.cancel()
     }
 
     /**

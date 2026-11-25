@@ -163,7 +163,7 @@ class AppBridge(
                     val insertedId = repository.insertOrUpdateEpisode(episode)
                     val epId = if (existingEp != null) existingEp.id else insertedId
 
-                    // 「仕様の穴」：もしスクリプトが親切にも本文を入れてきていたら、受動的にキャッシュ保存してしまう
+                    // スクリプトから本文データが渡されている場合はキャッシュへ保存
                     if (!contentHtml.isNullOrEmpty()) {
                         val path = cacheManager.saveEpisode(
                             novelId = novelId,

@@ -8,6 +8,15 @@ import okhttp3.Request
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
+class HttpStatusException(
+    val statusCode: Int,
+    val url: String
+) : IOException("HTTP error code: $statusCode for URL: $url") {
+    fun isRateLimitOrOverloaded(): Boolean {
+        return statusCode == 429 || statusCode == 502 || statusCode == 503 || statusCode == 504
+    }
+}
+
 class NativeHttpClient {
 
     private val client: OkHttpClient = OkHttpClient.Builder()
@@ -38,7 +47,7 @@ class NativeHttpClient {
 
         client.newCall(requestBuilder.build()).execute().use { response ->
             if (!response.isSuccessful) {
-                throw IOException("HTTP error code: ${response.code} for URL: $url")
+                throw HttpStatusException(response.code, url)
             }
             response.body?.string() ?: ""
         }
@@ -51,7 +60,7 @@ class NativeHttpClient {
         }
         client.newCall(requestBuilder.build()).execute().use { response ->
             if (!response.isSuccessful) {
-                throw IOException("HTTP error code: ${response.code} for URL: $url")
+                throw HttpStatusException(response.code, url)
             }
             response.body?.bytes() ?: ByteArray(0)
         }

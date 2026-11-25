@@ -85,7 +85,7 @@ data class ParsedEpisodeSummary(
     val url: String,
     val chapter: String? = null,
     val updatedAt: String? = null,
-    val contentHtml: String? = null // 同期時キャッシュ（仕様の穴）用
+    val contentHtml: String? = null
 )
 
 @Serializable
