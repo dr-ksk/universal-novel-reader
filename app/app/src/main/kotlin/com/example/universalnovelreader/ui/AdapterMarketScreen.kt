@@ -44,13 +44,17 @@ fun AdapterMarketScreen(
     var selectedTab by remember { mutableStateOf(0) } // 0: 公式, 1: 野良, 2: カスタム
     var selectedCustomSource by remember { mutableStateOf<CustomCatalogSource?>(null) }
     var searchQuery by remember { mutableStateOf("") }
+    var sortByLikes by remember { mutableStateOf(true) }
 
     var entries by remember { mutableStateOf<List<CatalogEntry>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     var pendingInstallPackage by remember { mutableStateOf<AdapterPackage?>(null) }
+    var pendingInstallEntry by remember { mutableStateOf<CatalogEntry?>(null) }
     var downloadingId by remember { mutableStateOf<String?>(null) }
+    var votingId by remember { mutableStateOf<String?>(null) }
+    var likedIds by remember { mutableStateOf(viewModel.catalogClient.loadLikedAdapterIds()) }
     var showAddSourceDialog by remember { mutableStateOf(false) }
 
     fun openExternalUrl(url: String) {
@@ -81,7 +85,7 @@ fun AdapterMarketScreen(
                 entries = res.getOrNull()?.adapters ?: emptyList()
             } else {
                 entries = emptyList()
-                errorMessage = "カタログの取得に失敗しました。\nGitHub Pages が公開済みか、通信環境を確認してください。\n(${res.exceptionOrNull()?.message ?: "不明なエラー"})"
+                errorMessage = "カタログの取得に失敗しました。\n通信環境を確認して再試行してください。\n(${res.exceptionOrNull()?.message ?: "不明なエラー"})"
             }
         }
     }
@@ -94,14 +98,23 @@ fun AdapterMarketScreen(
         }
     }
 
-    val filteredEntries = remember(entries, searchQuery) {
+    val filteredEntries = remember(entries, searchQuery, selectedTab, sortByLikes) {
         val q = searchQuery.trim().lowercase()
-        if (q.isEmpty()) entries else entries.filter { e ->
+        val matched = if (q.isEmpty()) entries else entries.filter { e ->
             e.name.lowercase().contains(q) ||
                 e.adapterId.lowercase().contains(q) ||
                 e.description.lowercase().contains(q) ||
                 e.author.lowercase().contains(q) ||
                 e.domainPattern.lowercase().contains(q)
+        }
+        if (selectedTab == 1) {
+            if (sortByLikes) {
+                matched.sortedWith(compareByDescending<CatalogEntry> { it.likes }.thenByDescending { it.updatedAt ?: "" })
+            } else {
+                matched.sortedByDescending { it.updatedAt ?: "" }
+            }
+        } else {
+            matched
         }
     }
 
@@ -214,7 +227,7 @@ fun AdapterMarketScreen(
                     .padding(horizontal = 16.dp, vertical = 10.dp)
             )
 
-            // 野良タブの案内＆Webビルダー誘導
+            // 野良タブの案内＆いいね順ソート＆Webビルダー誘導
             if (selectedTab == 1) {
                 Surface(
                     color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
@@ -224,18 +237,32 @@ fun AdapterMarketScreen(
                         .padding(horizontal = 16.dp)
                         .padding(bottom = 8.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "新しいサイト定義の作成・投稿は PC の Web ビルダーから行えます。",
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.weight(1f)
-                        )
-                        TextButton(onClick = { openExternalUrl(AdapterCatalogClient.WEB_HUB_URL) }) {
-                            Text("ビルダーを開く")
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "動いた定義には「👍 いいね」を押すと、安全・動作確認の目安になります。",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(onClick = { openExternalUrl(AdapterCatalogClient.WEB_HUB_URL) }) {
+                                Text("ビルダー")
+                            }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = sortByLikes,
+                                onClick = { sortByLikes = true },
+                                label = { Text("👍 いいね順") }
+                            )
+                            FilterChip(
+                                selected = !sortByLikes,
+                                onClick = { sortByLikes = false },
+                                label = { Text("新着順") }
+                            )
                         }
                     }
                 }
@@ -291,8 +318,8 @@ fun AdapterMarketScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             if (selectedTab == 1) {
-                                OutlinedButton(onClick = { openExternalUrl(AdapterCatalogClient.COMMUNITY_ISSUES_URL) }) {
-                                    Text("野良掲示板 (GitHub Issues) を開く")
+                                OutlinedButton(onClick = { openExternalUrl(AdapterCatalogClient.WEB_HUB_URL) }) {
+                                    Text("Webビルダーで投稿する")
                                 }
                             }
                         }
@@ -310,13 +337,17 @@ fun AdapterMarketScreen(
                             MarketEntryCard(
                                 entry = entry,
                                 existing = existing,
+                                showCommunityTrust = selectedTab == 1,
                                 isDownloading = downloadingId == entry.adapterId,
+                                isLiked = likedIds.contains(entry.adapterId),
+                                isVoting = votingId == entry.adapterId,
                                 onInstallClick = {
                                     scope.launch {
                                         downloadingId = entry.adapterId
                                         val res = viewModel.catalogClient.fetchAdapterPackage(entry.downloadUrl)
                                         downloadingId = null
                                         if (res.isSuccess) {
+                                            pendingInstallEntry = entry
                                             pendingInstallPackage = res.getOrNull()
                                         } else {
                                             Toast.makeText(
@@ -327,6 +358,35 @@ fun AdapterMarketScreen(
                                         }
                                     }
                                 },
+                                onLikeClick = if (selectedTab == 1) {
+                                    {
+                                        scope.launch {
+                                            votingId = entry.adapterId
+                                            val res = viewModel.catalogClient.toggleCommunityLike(entry.adapterId)
+                                            votingId = null
+                                            val vote = res.getOrNull()
+                                            if (vote != null) {
+                                                likedIds = viewModel.catalogClient.loadLikedAdapterIds()
+                                                entries = entries.map { item ->
+                                                    if (item.adapterId == vote.adapterId) {
+                                                        item.copy(likes = vote.likes, reports = vote.reports)
+                                                    } else item
+                                                }
+                                                Toast.makeText(
+                                                    context,
+                                                    if (vote.voted) "「${entry.name}」に 👍 いいねしました" else "「${entry.name}」の 👍 いいねを取り消しました",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            } else {
+                                                Toast.makeText(
+                                                    context,
+                                                    "いいねの送信に失敗しました: ${res.exceptionOrNull()?.message}",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        }
+                                    }
+                                } else null,
                                 onOpenDiscussion = entry.discussionUrl?.let { url ->
                                     { openExternalUrl(url) }
                                 }
@@ -344,10 +404,16 @@ fun AdapterMarketScreen(
         AdapterImportConfirmDialog(
             pkg = pkg,
             existing = existing,
-            onDismiss = { pendingInstallPackage = null },
+            likesCount = pendingInstallEntry?.likes,
+            reportsCount = pendingInstallEntry?.reports,
+            onDismiss = {
+                pendingInstallPackage = null
+                pendingInstallEntry = null
+            },
             onConfirm = {
                 viewModel.importAdapterPackage(pkg) {
                     pendingInstallPackage = null
+                    pendingInstallEntry = null
                     Toast.makeText(
                         context,
                         if (existing != null) "「${pkg.name}」を v${pkg.version} へ更新しました" else "「${pkg.name}」を追加しました",
@@ -374,12 +440,17 @@ fun AdapterMarketScreen(
 private fun MarketEntryCard(
     entry: CatalogEntry,
     existing: SiteAdapter?,
+    showCommunityTrust: Boolean,
     isDownloading: Boolean,
+    isLiked: Boolean = false,
+    isVoting: Boolean = false,
     onInstallClick: () -> Unit,
-    onOpenDiscussion: (() -> Unit)?
+    onLikeClick: (() -> Unit)? = null,
+    onOpenDiscussion: (() -> Unit)? = null
 ) {
     val isInstalled = existing != null
     val hasUpdate = existing != null && existing.version != entry.version
+    val isTrustedCommunity = showCommunityTrust && entry.likes >= 3 && entry.reports == 0
 
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -421,6 +492,51 @@ private fun MarketEntryCard(
                 }
             }
 
+            if (showCommunityTrust) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        color = if (isTrustedCommunity) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        },
+                        shape = MaterialTheme.shapes.extraSmall
+                    ) {
+                        Text(
+                            text = if (isTrustedCommunity) {
+                                "✓ 動作確認済み 👍 ${entry.likes}"
+                            } else {
+                                "👍 いいね ${entry.likes}"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (isTrustedCommunity) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isTrustedCommunity) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                        )
+                    }
+                    if (entry.reports > 0) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            shape = MaterialTheme.shapes.extraSmall
+                        ) {
+                            Text(
+                                text = "👎 報告 ${entry.reports}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
             if (entry.description.isNotBlank()) {
                 Text(
                     text = entry.description,
@@ -450,12 +566,30 @@ private fun MarketEntryCard(
                 )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (onOpenDiscussion != null) {
+                    if (onLikeClick != null) {
+                        if (isLiked) {
+                            FilledTonalButton(
+                                onClick = onLikeClick,
+                                enabled = !isVoting,
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(if (isVoting) "..." else "👍 済み", fontSize = 12.sp)
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = onLikeClick,
+                                enabled = !isVoting,
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(if (isVoting) "..." else "👍 いいね", fontSize = 12.sp)
+                            }
+                        }
+                    } else if (onOpenDiscussion != null) {
                         OutlinedButton(
                             onClick = onOpenDiscussion,
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                         ) {
-                            Text("掲示板", fontSize = 12.sp)
+                            Text("👍 いいね", fontSize = 12.sp)
                         }
                     }
 
@@ -474,7 +608,7 @@ private fun MarketEntryCard(
                         } else {
                             Text(
                                 text = when {
-                                    hasUpdate -> "更新 (${existing!!.version}→${entry.version})"
+                                    hasUpdate -> "更新 (${existing.version}→${entry.version})"
                                     isInstalled -> "導入済み"
                                     else -> "追加"
                                 },
@@ -492,6 +626,8 @@ private fun MarketEntryCard(
 fun AdapterImportConfirmDialog(
     pkg: AdapterPackage,
     existing: SiteAdapter?,
+    likesCount: Int? = null,
+    reportsCount: Int? = null,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
@@ -522,6 +658,30 @@ fun AdapterImportConfirmDialog(
                     },
                     style = MaterialTheme.typography.bodySmall
                 )
+                if (likesCount != null) {
+                    val reportNote = if ((reportsCount ?: 0) > 0) " / 👎 報告 ${reportsCount}件" else ""
+                    val trustLabel = when {
+                        likesCount >= 3 && (reportsCount ?: 0) == 0 -> "✓ コミュニティ動作確認済み（👍 ${likesCount}件）"
+                        likesCount > 0 -> "👍 いいね ${likesCount}件$reportNote"
+                        else -> "👍 いいね 0件（まだ動作確認評価がありません）$reportNote"
+                    }
+                    Surface(
+                        color = if (likesCount >= 3 && (reportsCount ?: 0) == 0) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        },
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = trustLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
+                }
                 if (pkg.author.isNotBlank()) {
                     Text("作成者: ${pkg.author}", style = MaterialTheme.typography.bodySmall)
                 }
